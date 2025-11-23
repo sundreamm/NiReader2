@@ -1,0 +1,47 @@
+name: Deploy to GitHub Pages
+
+on:
+  # 在推送到 main 分支时触发部署
+  push:
+    branches:
+      - main
+  # 允许手动从 Actions 标签页运行工作流
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    # 设置权限，允许 Actions 写入 Pages
+    permissions:
+      contents: write 
+      pages: write 
+      id-token: write
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 设置 Node.js 环境 (使用 Node 20)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 3. 安装依赖
+      - name: Install dependencies
+        run: npm install
+
+      # 4. 运行 Vite 构建 (创建 /dist 目录)
+      - name: Build project
+        run: npm run build
+
+      # 5. 部署到 GitHub Pages (使用官方 Actions)
+      - name: Deploy to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist' 
+          
+      - name: Create Deployment
+        id: deployment
+        uses: actions/deploy-pages@v4
