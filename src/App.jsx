@@ -37,8 +37,6 @@ const auth = getAuth(app);
 console.log("Firebase Log: Debug mode enabled.");
 
 
-const apiKey = "AIzaSyBmKOwpZQZSllZzjWcGVav66N7ZGfr7t8Q";
-
 // --- 1. 结构化回答渲染引擎 ---
 function StructuralResponseRenderer({ data, fullContext }) {
   if (!data) return null;
@@ -141,7 +139,7 @@ function FollowUpSystem({ contextLabel, contextContent, fullContext, colorTheme 
   };
   const theme = styles[colorTheme] || styles.indigo;
 
-  const handleAsk = async (queryType, queryText) => {
+const handleAsk = async (queryType, queryText) => {
     if (!contextContent || !queryText.trim()) return;
     setLoading(true);
     setIsExpanded(true);
@@ -149,7 +147,7 @@ function FollowUpSystem({ contextLabel, contextContent, fullContext, colorTheme 
     setResponseType(queryType === 'why' ? 'why' : 'custom');
 
     if (queryType === 'custom') {
-        setUserQuestion(queryText); // Cache the question
+        setUserQuestion(queryText);
     } else {
         setUserQuestion('');
     }
@@ -174,27 +172,44 @@ function FollowUpSystem({ contextLabel, contextContent, fullContext, colorTheme 
       const userPayload = `原文全貌参考：\n${fullContext}\n\n用户追问内容：${queryText}`;
 
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-  {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+        // 确保此处端点已同步更新为稳定版本
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: userPayload }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ parts: [{ text: systemPrompt + "\n\n" + userPayload }] }],
             generationConfig: { responseMimeType: "application/json" }
           }),
         }
       );
+
+      // 1. 客观拦截真实的网络与权限错误
+      if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(`网络或鉴权被拒 (${res.status}): ${errData.error?.message || '未知异常'}`);
+      }
+
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      const parsed = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+      
+      if (!text) {
+          throw new Error("模型返回了空数据节点。");
+      }
+
+      // 2. 增强型 JSON 提取机制：消除所有非 JSON 字符的干扰
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const jsonString = jsonMatch ? jsonMatch[0] : text;
+
+      const parsed = JSON.parse(jsonString);
       setResponseData(parsed);
 
     } catch (err) {
-      console.error(err);
+      console.error("追问逻辑链断裂:", err);
+      // 将真实的底层错误暴露给渲染层，消除“解析错误”的黑盒状态
       setResponseData({
-        topic: "解析错误",
-        core_logic: "无法生成结构化数据，请重试。",
+        topic: "逻辑推演阻断",
+        core_logic: `错误详情：${err.message}`,
         flow_steps: [],
         key_insights: []
       });
@@ -572,7 +587,7 @@ export default function NiPhilosophyReader() {
   
   const callGemini = async (prompt) => {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`,
   {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
