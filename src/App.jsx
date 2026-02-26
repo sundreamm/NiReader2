@@ -10,13 +10,13 @@ import {
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyDgR78eCa155Jy62H4gXkHqndNDOZcOopE",
-  authDomain: "test-3ab01.firebaseapp.com",
-  projectId: "test-3ab01",
-  storageBucket: "test-3ab01.firebasestorage.app",
-  messagingSenderId: "822221024280",
-  appId: "1:822221024280:web:61328a4f3206ecbd36a76d",
-  measurementId: "G-8TYDJE60KX"
+  apiKey: "AIzaSyCqMUIqxyOsrP3vX7CF1IJeq1LYkIMl9kw",
+  authDomain: "nireader.firebaseapp.com",
+  projectId: "nireader",
+  storageBucket: "nireader.firebasestorage.app",
+  messagingSenderId: "1097091728184",
+  appId: "1:1097091728184:web:3c5c518af3bf1746b4f7cd",
+  measurementId: "G-P22VB0JMRJ"
 };
 
 // Global Canvas Variables 
@@ -37,7 +37,7 @@ const auth = getAuth(app);
 console.log("Firebase Log: Debug mode enabled.");
 
 
-const apiKey = "AIzaSyDH2eCOG4IACULi3kR0LQxOiTTqIOS1MiI";
+const apiKey = "AIzaSyBmKOwpZQZSllZzjWcGVav66N7ZGfr7t8Q";
 
 // --- 1. 结构化回答渲染引擎 ---
 function StructuralResponseRenderer({ data, fullContext }) {
@@ -174,10 +174,10 @@ function FollowUpSystem({ contextLabel, contextContent, fullContext, colorTheme 
       const userPayload = `原文全貌参考：\n${fullContext}\n\n用户追问内容：${queryText}`;
 
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: userPayload }] }],
             systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -571,26 +571,39 @@ export default function NiPhilosophyReader() {
   };
   
   const callGemini = async (prompt) => {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json" }
-        }),
-      }
-    );
-    const json = await res.json();
-    const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-    try {
-        return JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
-    } catch (e) {
-        console.error("Failed to parse AI JSON response:", text);
-        throw new Error("AI response format error.");
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      }),
     }
-  };
+  );
+  
+  // 识别并拦截客观的请求错误
+  if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(`API 异常: ${res.status} ${errorData.error?.message || '未知错误'}`);
+  }
+
+  const json = await res.json();
+  const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+  
+  // 拦截空数据导致的引用错误
+  if (typeof text === 'undefined') {
+      throw new Error("API 响应结构异常，未包含预期文本。");
+  }
+
+  try {
+      return JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+  } catch (e) {
+      console.error("Failed to parse AI JSON response:", text);
+      throw new Error("AI 返回数据格式非严格 JSON。");
+  }
+};
 
   const analyzeText = async () => {
     if (!inputText.trim()) return;
